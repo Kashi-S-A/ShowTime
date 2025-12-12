@@ -13,6 +13,8 @@ import com.showtime.bookingservice.dto.BookingRequestDTO;
 import com.showtime.bookingservice.dto.BookingResponseDTO;
 import com.showtime.bookingservice.enums.BookingStatus;
 import com.showtime.bookingservice.enums.StatusSeat;
+import com.showtime.bookingservice.exception.BadRequestException;
+import com.showtime.bookingservice.exception.ResourceNotFoundException;
 import com.showtime.bookingservice.model.Booking;
 import com.showtime.bookingservice.model.BookingSeat;
 import com.showtime.bookingservice.model.Seat;
@@ -49,48 +51,32 @@ public class Boooking_ServiceImpl implements Booking_Service{
 		
 		 // Validate request IDs
 		    if (request.getUser_id() == null) {
-		        throw new IllegalArgumentException("User ID cannot be null");
+		        throw new BadRequestException("User ID cannot be null");
 		    }
 		    if (request.getShow_id() == null) {
-		        throw new IllegalArgumentException("Show ID cannot be null");
+		        throw new BadRequestException("Show ID cannot be null");
 		    }
 		    if (request.getSeat_id() == null || request.getSeat_id().isEmpty() || request.getSeat_id().contains(null)) {
-		        throw new IllegalArgumentException("Seat IDs cannot be null or empty");
+		        throw new BadRequestException("Seat IDs cannot be null or empty");
 		    }
 
         // 1. Validate user and show
         User user = userRepository.findById(request.getUser_id())
-                .orElseThrow(() -> new UsernameNotFoundException("User not Found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not Found"));
 
         Show show = showRepository.findById(request.getShow_id())
-                .orElseThrow(() -> new UsernameNotFoundException("Show not found"));
-		
-//        // 2. Lock seats (pessimistic)
-//        List<Seat> seats = seatRepository.findBySeatIdIn(request.getSeat_id());
-//
-//        if (seats.size() != request.getSeat_id().size()) {
-//            throw new RuntimeException("One or more seats are invalid");
-//        }
-//        
-//        // 3. Check availability
-//        for (Seat seat : seats) {
-//        	 StatusSeat status = seat.getStatus();
-//
-//        	    if (status == StatusSeat.BOOKED || status == StatusSeat.LOCKED) {
-//        	        throw new RuntimeException("Seat " + seat.getSeatNumber() + " is already booked/locked");
-//        	    }
-//        }
-    
-        List<Seat> seats = checkSeatAvailability(request.getSeat_id());
+                .orElseThrow(() -> new ResourceNotFoundException("Show not found"));
+
+        // Check seat Availability
+      List<Seat> seats = checkSeatAvailability(request.getSeat_id());
+        
         
         // 4. Lock the seats temporarily
         for (Seat seat : seats) {
             seat.setStatus(StatusSeat.LOCKED);
             seatRepository.save(seat);
         }
-        
-        
-        
+               
         // 5. Calculate amount
         double totalAmount = 0;
 
@@ -154,9 +140,10 @@ public class Boooking_ServiceImpl implements Booking_Service{
 	public List<Seat> checkSeatAvailability(List<Integer> seatIds) {
 		 // 2. Lock seats (pessimistic)
         List<Seat> seats = seatRepository.findBySeatIdIn(seatIds);
+        
 
         if (seats.size() != seatIds.size()) {
-            throw new RuntimeException("One or more seats are invalid");
+            throw new ResourceNotFoundException("One or more seats are invalid");
         }
         
         // 3. Check availability
@@ -164,18 +151,18 @@ public class Boooking_ServiceImpl implements Booking_Service{
         	 StatusSeat status = seat.getStatus();
 
         	    if (status == StatusSeat.BOOKED || status == StatusSeat.LOCKED) {
-        	        throw new RuntimeException("Seat " + seat.getSeatNumber() + " is already booked/locked");
+        	        throw new BadRequestException("Seat " + seat.getSeatNumber() + " is locked");
         	    }
         }
         return seats;
-	}
+	}	
 	
 	//2. To find booking by booking Id
 
 	@Override
 	public BookingResponseDTO getBookingById(Integer bookingId) {
 		 Booking booking = bookingRepository.findById(bookingId)
-	                .orElseThrow(() -> new RuntimeException("Booking not found"));
+	                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
 	    // Sum amount from BookingSeat if you want accuracy
 		 List<BookingSeat> bookingSeats = bookingSeatRepository.findByBooking(booking);
@@ -224,7 +211,7 @@ public class Boooking_ServiceImpl implements Booking_Service{
 	public List<BookingResponseDTO> getBookingsByUserId(Integer userId) {
 		
 		User user = userRepository.findById(userId)
-		            .orElseThrow(() -> new RuntimeException("User not found"));
+		            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 		 
 		List<Booking> bookings = bookingRepository.findByUser(user);
 		
@@ -255,10 +242,10 @@ public class Boooking_ServiceImpl implements Booking_Service{
 	public void cancelBooking(Integer bookingId) {
 	    
 	    Booking booking = bookingRepository.findById(bookingId)
-	            .orElseThrow(() -> new RuntimeException("Booking not found"));
+	            .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
 	    if (!booking.getStatus().equals(BookingStatus.CONFIRMED)) {
-	        throw new RuntimeException("You can cancel only confirmed bookings");
+	        throw new BadRequestException("You can cancel only confirmed bookings");
 	    }
 
 	 // 2️- Unlock seats associated with this booking
