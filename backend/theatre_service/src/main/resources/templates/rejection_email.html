@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Rejection Email</title>
+    <meta charset="UTF-8" />
+</head>
+
+<body style="font-family: 'Poppins', Arial, sans-serif; background: #f4f6f8; padding: 0; margin: 0;">
+
+    <div style="
+        max-width: 600px;
+        background: #ffffff;
+        margin: 40px auto;
+        padding: 25px 35px;
+        border-radius: 12px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        border-top: 6px solid #E53E3E;
+    ">
+
+        <h2 style="text-align: center; color: #333; margin-bottom: 20px;">
+            ❗ Theatre Admin Request Rejected
+        </h2>
+
+        <p style="font-size: 16px; color: #444;">
+            Hello <strong th:text="${name}">Name</strong>,
+        </p>
+
+        <p style="font-size: 15px; color: #555; line-height: 1.6;">
+            We regret to inform you that your <b>Theatre Admin registration request</b> has been 
+            <span style="color:#E53E3E; font-weight:bold;">REJECTED</span>.
+        </p>
+
+        <div style="
+            background: #FFF5F5;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #E53E3E;
+        ">
+            <p style="margin: 0; font-size: 15px; color: #333;">
+                <b>Reason:</b>
+            </p>
+
+            <p style="margin: 8px 0 0; font-size: 15px; color: #333;"
+               th:text="${reason}">
+                Rejection reason goes here
+            </p>
+        </div>
+
+        <p style="font-size: 15px; color: #555;">
+            You may contact our support team for more clarification or to reapply with the correct details.
+        </p>
+
+        <p style="font-size: 15px; margin-top: 25px; color: #444;">
+            Regards,<br>
+            <strong>ShowTime Super Admin Team</strong>
+        </p>
+
+        <div style="text-align: center; margin-top: 30px; color: #888; font-size: 12px;">
+            © 2025 ShowTime Entertainment — All Rights Reserved
+        </div>
+
+    </div>
+
+</body>
+</html>

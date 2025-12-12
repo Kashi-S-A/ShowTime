@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Theatre Rejected</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: auto;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #d9534f;
+            text-align: center;
+        }
+        p {
+            font-size: 15px;
+            color: #333333;
+            line-height: 1.6;
+        }
+        b {
+            color: #d9534f;
+        }
+        .reason-box {
+            background: #ffe6e6;
+            padding: 12px;
+            border-left: 4px solid #d9534f;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #666666;
+        }
+    </style>
+</head>
+
+<body>
+<div class="email-container">
+
+    <h2>⚠ Theatre Rejected</h2>
+
+    <p>Hello <span th:text="${name}">Name</span>,</p>
+
+    <p>Your theatre request 
+        <b><span th:text="${theatreName}">Theatre</span></b> 
+        has been <b>REJECTED</b>.
+    </p>
+
+    <p><b>Reason:</b></p>
+    <div class="reason-box">
+        <span th:text="${reason}">Rejection Reason</span>
+    </div>
+
+    <p>Please re-upload valid documents and submit again.</p>
+
+    <p class="footer">
+        Regards,<br>
+        <b>ShowTime Super Admin</b>
+    </p>
+
+</div>
+</body>
+</html>
