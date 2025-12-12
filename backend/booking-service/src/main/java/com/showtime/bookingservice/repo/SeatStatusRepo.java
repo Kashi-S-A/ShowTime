@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.showtime.bookingservice.model.SeatStatus;
+import com.showtime.bookingservice.model.User;
 
 import jakarta.persistence.LockModeType;
 
@@ -24,5 +25,7 @@ public interface SeatStatusRepo extends JpaRepository<SeatStatus, Integer> {
 	            @Param("showId") Integer showId
 	    );
 
-
+	
+	 
+	
 }

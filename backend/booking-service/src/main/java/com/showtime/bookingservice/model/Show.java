@@ -23,6 +23,7 @@ import lombok.Data;
 public class Show {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "show_id")
 	private Integer show_id;
 	
 	@ManyToOne
