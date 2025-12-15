@@ -4,9 +4,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.management.RuntimeErrorException;
-
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.showtime.bookingservice.dto.BookingRequestDTO;
@@ -34,237 +31,251 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class Boooking_ServiceImpl implements Booking_Service{
-	
-	private final UserRepo userRepository;
+public class Boooking_ServiceImpl implements Booking_Service {
+
+    private final UserRepo userRepository;
     private final ShowRepo showRepository;
     private final SeatRepo seatRepository;
     private final BookingRepo bookingRepository;
     private final BookingSeatRepo bookingSeatRepository;
     private final SeatStatusRepo seatStatusRepository;
-    
-    
-    // 1. To Create booking
-	@Override
-	@Transactional
-	public BookingResponseDTO createBooking(BookingRequestDTO request) {
-		
-		 // Validate request IDs
-		    if (request.getUser_id() == null) {
-		        throw new BadRequestException("User ID cannot be null");
-		    }
-		    if (request.getShow_id() == null) {
-		        throw new BadRequestException("Show ID cannot be null");
-		    }
-		    if (request.getSeat_id() == null || request.getSeat_id().isEmpty() || request.getSeat_id().contains(null)) {
-		        throw new BadRequestException("Seat IDs cannot be null or empty");
-		    }
 
-        // 1. Validate user and show
+    // ================= CREATE BOOKING =================
+    @Override
+    @Transactional
+    public BookingResponseDTO createBooking(BookingRequestDTO request) {
+
+        // 1️ -> Validate request
+	        if (request.getUser_id() == null)
+	            throw new BadRequestException("User ID cannot be null");
+	
+	        if (request.getShow_id() == null)
+	            throw new BadRequestException("Show ID cannot be null");
+	
+	        if (request.getSeat_id() == null || request.getSeat_id().isEmpty())
+	            throw new BadRequestException("Seat IDs cannot be empty");
+
+        // 2️ -> Validate user & show
         User user = userRepository.findById(request.getUser_id())
-                .orElseThrow(() -> new ResourceNotFoundException("User not Found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Show show = showRepository.findById(request.getShow_id())
                 .orElseThrow(() -> new ResourceNotFoundException("Show not found"));
 
-        // Check seat Availability
-      List<Seat> seats = checkSeatAvailability(request.getSeat_id());
-        
-        
-        // 4. Lock the seats temporarily
-        for (Seat seat : seats) {
-            seat.setStatus(StatusSeat.LOCKED);
-            seatRepository.save(seat);
-        }
-               
-        // 5. Calculate amount
-        double totalAmount = 0;
+        // 3️-> Check availability + release expired locks
+        List<Seat> seats = checkSeatAvailability(request.getSeat_id(), show);
 
+        // 4️ -> Calculate total amount
+        double totalAmount = 0;
         for (Seat seat : seats) {
             totalAmount += seat.getCategory().getPrice();
         }
-        
-        // 6. Create booking with INITIATED status
-   
+
+        // 5️-> Create booking (INITIATED)
         Booking booking = new Booking();
         booking.setUser(user);
         booking.setShow(show);
         booking.setTotal_amount(totalAmount);
         booking.setStatus(BookingStatus.INITIATED);
         booking.setCreated_at(LocalDateTime.now());
-        
         booking = bookingRepository.save(booking);
-        
-     // 7. Locking seats before creating BookingSeat
-        List<SeatStatus> lockedSeatStatuses = new ArrayList<>(); // collect locked SeatStatus
+
+        // 6️-> Lock seats for 5 minutes (SeatStatus)
+        List<SeatStatus> lockedSeatStatuses = new ArrayList<>();
 
         for (Seat seat : seats) {
-            SeatStatus seatStatus = new SeatStatus();
+
+        	SeatStatus seatStatus = seatStatusRepository.findBySeatAndShow(seat, show)
+                    .orElse(new SeatStatus());
             seatStatus.setSeat(seat);
             seatStatus.setShow(show);
             seatStatus.setStatus("LOCKED");
-            seatStatus.setLocked_until(LocalDateTime.now().plusMinutes(5)); // 5 min lock
+            seatStatus.setLocked_until(LocalDateTime.now().plusMinutes(5));
             seatStatus.setLockedByUser(user);
-
-            // Save SeatStatus
             seatStatusRepository.save(seatStatus);
-
-            // Add to list for later
             lockedSeatStatuses.add(seatStatus);
+
+            // Update Seat table as LOCKED
+            seat.setStatus(StatusSeat.LOCKED);
+            seatRepository.save(seat);
         }
 
-        // 8. Create BookingSeat records
+        // 7️ -> Create BookingSeat records
         for (SeatStatus seatStatus : lockedSeatStatuses) {
+
             BookingSeat bookingSeat = new BookingSeat();
+            bookingSeat.setBooking(booking);
+            bookingSeat.setStatus(seatStatus);
+            bookingSeat.setAmount(
+                    seatStatus.getSeat().getCategory().getPrice()
+            );
 
-            bookingSeat.setBooking(booking);                                     // link booking
-            bookingSeat.setStatus(seatStatus);                                    // link SeatStatus
-            bookingSeat.setAmount(seatStatus.getSeat().getCategory().getPrice()); // get seat price
-
-            bookingSeatRepository.save(bookingSeat);                              // save to DB
+            bookingSeatRepository.save(bookingSeat);
         }
 
-
-     // 9. Prepare and return response
+        // 8️ -> Prepare response
         BookingResponseDTO response = new BookingResponseDTO();
-        String orderId = "BOOK-" + booking.getBooking_id();
-
         response.setBookingId(booking.getBooking_id());
         response.setStatus(booking.getStatus());
         response.setAmount(totalAmount);
-        response.setOrderId(orderId);
+        response.setOrderId("BOOK-" + booking.getBooking_id());
 
         return response;
-	}
-	
-	public List<Seat> checkSeatAvailability(List<Integer> seatIds) {
-		 // 2. Lock seats (pessimistic)
+    }
+
+    // ================= SEAT AVAILABILITY =================
+    private List<Seat> checkSeatAvailability(List<Integer> seatIds, Show show) {
+
         List<Seat> seats = seatRepository.findBySeatIdIn(seatIds);
-        
 
         if (seats.size() != seatIds.size()) {
-            throw new ResourceNotFoundException("One or more seats are invalid");
+            throw new ResourceNotFoundException("Invalid seat selection");
         }
-        
-        // 3. Check availability
-        for (Seat seat : seats) {
-        	 StatusSeat status = seat.getStatus();
 
-        	    if (status == StatusSeat.BOOKED || status == StatusSeat.LOCKED) {
-        	        throw new BadRequestException("Seat " + seat.getSeatNumber() + " is locked");
-        	    }
+        for (Seat seat : seats) {
+
+            // Seat already booked
+            if (seat.getStatus() == StatusSeat.BOOKED) {
+                throw new BadRequestException(
+                        "Seat " + seat.getSeatNumber() + " already booked"
+                );
+            }
+
+            // Check SeatStatus lock
+            SeatStatus seatStatus =
+                    seatStatusRepository.findBySeatAndShow(seat, show).orElse(null);
+
+            if (seatStatus != null && "LOCKED".equals(seatStatus.getStatus())) {
+
+                //  Lock still valid
+                if (seatStatus.getLocked_until().isAfter(LocalDateTime.now())) {
+                    throw new BadRequestException(
+                            "Seat " + seat.getSeatNumber() + " is temporarily locked"
+                    );
+                }
+
+                //  Lock expired → release
+                seatStatus.setStatus("AVAILABLE");
+                seatStatus.setLocked_until(null);
+                seatStatus.setLockedByUser(null);
+                seatStatusRepository.save(seatStatus);
+            }
         }
         return seats;
-	}	
-	
-	//2. To find booking by booking Id
+    }
 
-	@Override
-	public BookingResponseDTO getBookingById(Integer bookingId) {
-		 Booking booking = bookingRepository.findById(bookingId)
-	                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+    // ================= GET BOOKING BY ID =================
+    @Override
+    public BookingResponseDTO getBookingById(Integer bookingId) {
 
-	    // Sum amount from BookingSeat if you want accuracy
-		 List<BookingSeat> bookingSeats = bookingSeatRepository.findByBooking(booking);
-		 double totalAmount = 0.0;
-		 for (BookingSeat bs : bookingSeats) {
-		     totalAmount += bs.getAmount();
-		 }
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
-	        BookingResponseDTO response = new BookingResponseDTO();
-	        response.setBookingId(booking.getBooking_id());
-//	        response.setStatus("BOOKED"); // or actual status if you have it
-	        response.setStatus(booking.getStatus());
-	        response.setAmount(totalAmount);
-	        response.setOrderId("BOOK-" + booking.getBooking_id());
+        List<BookingSeat> bookingSeats =
+                bookingSeatRepository.findByBooking(booking);
 
-	        return response;
-	}	
-	
-	//3. To get all bookings
-	@Override
-	public List<BookingResponseDTO> getAllBookings() {
-	    List<Booking> bookings = bookingRepository.findAll();
-	    List<BookingResponseDTO> responseList = new ArrayList<>();
+        double totalAmount = 0;
+        for (BookingSeat bookingSeat : bookingSeats) {
+            totalAmount += bookingSeat.getAmount();
+        }
+        
+        BookingResponseDTO response = new BookingResponseDTO();
+        response.setBookingId(booking.getBooking_id());
+        response.setStatus(booking.getStatus());
+        response.setAmount(totalAmount);
+        response.setOrderId("BOOK-" + booking.getBooking_id());
 
-	    for (Booking booking : bookings) {
-	        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBooking(booking);
-	        double totalAmount = 0.0;
-	        for (BookingSeat bs : bookingSeats) {
-	            totalAmount += bs.getAmount();
-	        }
+        return response;
+    }
 
-	        BookingResponseDTO dto = new BookingResponseDTO();
-	        dto.setBookingId(booking.getBooking_id());
-	        dto.setStatus(booking.getStatus()); // Or use actual booking status
-	        dto.setAmount(totalAmount);
-	        dto.setOrderId("BOOK-" + booking.getBooking_id());
+    // ================= GET ALL BOOKINGS =================
+    @Override
+    public List<BookingResponseDTO> getAllBookings() {
 
-	        responseList.add(dto);
-	    }
-	    return responseList;
-	
-	} 
-	
-	// 4. get booking by user_id
-	@Override
-	public List<BookingResponseDTO> getBookingsByUserId(Integer userId) {
-		
-		User user = userRepository.findById(userId)
-		            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-		 
-		List<Booking> bookings = bookingRepository.findByUser(user);
-		
-		 List<BookingResponseDTO> responseList = new ArrayList<>();
-		    for (Booking booking : bookings) {
-		        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBooking(booking);
-		        double totalAmount = 0.0;
-		        for (BookingSeat bs : bookingSeats) {
-		            totalAmount += bs.getAmount();
-		        }
+        List<Booking> bookings = bookingRepository.findAll();
+        List<BookingResponseDTO> responses = new ArrayList<>();
 
-		        BookingResponseDTO dto = new BookingResponseDTO();
-		        dto.setBookingId(booking.getBooking_id());
-		        dto.setStatus(booking.getStatus());
-		        dto.setAmount(totalAmount);
-		        dto.setOrderId("BOOK-" + booking.getBooking_id());
+        for (Booking booking : bookings) {
 
-		        responseList.add(dto);
-		    }
-		    return responseList;
-		}
-		
-	
-	// 5. cancel booking
-	
-	@Override
-	@Transactional
-	public void cancelBooking(Integer bookingId) {
-	    
-	    Booking booking = bookingRepository.findById(bookingId)
-	            .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        	double totalAmount = 0;
 
-	    if (!booking.getStatus().equals(BookingStatus.CONFIRMED)) {
-	        throw new BadRequestException("You can cancel only confirmed bookings");
-	    }
+        	// Fetch the list of BookingSeat objects for the booking
+        	List<BookingSeat> bookingSeats = bookingSeatRepository.findByBooking(booking);
 
-	 // 2️- Unlock seats associated with this booking
-	    List<BookingSeat> bookingSeats = bookingSeatRepository.findByBooking(booking);
-	    for (BookingSeat bs : bookingSeats) {
-	        SeatStatus seatStatus = bs.getStatus();
-	        seatStatus.setStatus("AVAILABLE"); // unlock
-	        seatStatus.setLockedByUser(null);
-	        seatStatus.setLocked_until(null);
-	        seatStatusRepository.save(seatStatus);
+        	// Loop through each BookingSeat and add its amount to totalAmount
+        	for (BookingSeat bs : bookingSeats) {
+        	    totalAmount += bs.getAmount();
+        	}
+        	
+            BookingResponseDTO dto = new BookingResponseDTO();
+            dto.setBookingId(booking.getBooking_id());
+            dto.setStatus(booking.getStatus());
+            dto.setAmount(totalAmount);
+            dto.setOrderId("BOOK-" + booking.getBooking_id());
 
-	        // Update Seat entity as well
-	        Seat seat = seatStatus.getSeat();
-	        seat.setStatus(StatusSeat.AVAILABLE);
-	        seatRepository.save(seat);
-	    }
+            responses.add(dto);
+        }
+        return responses;
+    }
 
-	    // 3️- Update booking status to CANCELLED
-	    booking.setStatus(BookingStatus.CANCELLED);
-	    bookingRepository.save(booking);
-	}
+    // ================= GET BOOKINGS BY USER =================
+    @Override
+    public List<BookingResponseDTO> getBookingsByUserId(Integer userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<Booking> bookings = bookingRepository.findByUser(user);
+        List<BookingResponseDTO> responses = new ArrayList<>();
+
+        for (Booking booking : bookings) {
+
+        	double totalAmount = 0;
+        	List<BookingSeat> bookingSeats = bookingSeatRepository.findByBooking(booking);
+        	for (BookingSeat bs : bookingSeats) {
+        	    totalAmount += bs.getAmount();
+        	}
+
+            BookingResponseDTO dto = new BookingResponseDTO();
+            dto.setBookingId(booking.getBooking_id());
+            dto.setStatus(booking.getStatus());
+            dto.setAmount(totalAmount);
+            dto.setOrderId("BOOK-" + booking.getBooking_id());
+
+            responses.add(dto);
+        }
+        return responses;
+    }
+
+    // ================= CANCEL BOOKING =================
+    @Override
+    @Transactional
+    public void cancelBooking(Integer bookingId) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!booking.getStatus().equals(BookingStatus.CONFIRMED)) {
+            throw new BadRequestException("Only confirmed bookings can be cancelled");
+        }
+
+        List<BookingSeat> bookingSeats =
+                bookingSeatRepository.findByBooking(booking);
+
+        for (BookingSeat bs : bookingSeats) {
+
+            SeatStatus seatStatus = bs.getStatus();
+            seatStatus.setStatus("AVAILABLE");
+            seatStatus.setLocked_until(null);
+            seatStatus.setLockedByUser(null);
+            seatStatusRepository.save(seatStatus);
+
+            Seat seat = seatStatus.getSeat();
+            seat.setStatus(StatusSeat.AVAILABLE);
+            seatRepository.save(seat);
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
+    }
 }

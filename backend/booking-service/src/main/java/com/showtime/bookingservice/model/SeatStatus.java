@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.showtime.bookingservice.enums.StatusSeat;
 
 import jakarta.annotation.Generated;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -25,6 +26,7 @@ public class SeatStatus {
 	
 	private String status;
 	
+	@Column(name = "locked_until")
 	private LocalDateTime Locked_until;
 	
 	@ManyToOne
