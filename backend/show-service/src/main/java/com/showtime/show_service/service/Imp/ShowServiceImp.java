@@ -20,6 +20,7 @@ public class ShowServiceImp implements ShowService {
 	@Autowired
 	private ShowRepository showRepository;
 	
+	//Add show
 	@Override
 	public ResponseEntity<String> addShow(Show show) {
 
@@ -28,7 +29,7 @@ public class ShowServiceImp implements ShowService {
 		return ResponseEntity.status(HttpStatus.CREATED).body("Show is saved with show_id : " + savedShow.getShowId());
 	}
 	
-	
+	//View all shows of the theatre
 	@Override
 	public List<Show> findByShowDate(LocalDate show_date) {
 
@@ -38,6 +39,7 @@ public class ShowServiceImp implements ShowService {
 	}
 
 
+	//View all shows on a particular screen
 	@Override
 	public List<Show> findByShowDate(LocalDate show_date, Long screen_id) {
 

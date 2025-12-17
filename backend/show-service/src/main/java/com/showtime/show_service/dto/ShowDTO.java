@@ -12,8 +12,8 @@ import lombok.Data;
 public class ShowDTO {
 
 	private LocalDate show_date;
-
-	private LocalTime show_time;
+	private LocalTime show_starttime;
+	private LocalTime show_endtime;
 	private String languages;
 	
 	private String title;
