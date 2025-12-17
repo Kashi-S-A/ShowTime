@@ -26,7 +26,8 @@ public class Show {
 	
 	@Column(name="show_date")
 	private LocalDate showDate;
-	private LocalTime show_time;
+	private LocalTime show_starttime;
+	private LocalTime show_endtime;
 	private String language;
 	
 	@Autowired
@@ -36,5 +37,9 @@ public class Show {
 	@Autowired
 	@ManyToOne
 	private Screen screen;
+	
+	@Autowired
+	@OneToMany
+	private List<ShowCategory> showCategory;
 	
 }
