@@ -59,7 +59,6 @@ public class TheatreAdmin {
 	@OneToMany(mappedBy = "theatreAdmin", cascade = CascadeType.ALL)
 	private List<Theatre> theatre;
 	
-	
 	@AssertTrue(message = "Rejection reason is required when status is REJECTED")
     public boolean isRejectionReasonValid() {
         if (status == TheatreAdminReqStatus.REJECTED) {

@@ -1,6 +1,6 @@
 package com.showtime.theatre_service.repository;
 
-import java.util.List;
+
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -15,4 +15,6 @@ public interface TheatreAdminRepo extends JpaRepository<TheatreAdmin, Integer>{
 	boolean existsByEmail(String email);
     Optional<TheatreAdmin> findByEmail(String email);
     Page<TheatreAdmin> findByStatus(TheatreAdminReqStatus status, Pageable pageable);
+    
+
 }
