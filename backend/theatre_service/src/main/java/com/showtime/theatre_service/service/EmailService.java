@@ -5,9 +5,15 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
+
 import com.showtime.theatre_service.util.EmailUtil;
+
+import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
@@ -16,6 +22,10 @@ public class EmailService {
 
 	    @Autowired
 	    private EmailUtil emailUtil;
+	    
+	    @Autowired
+	    private SpringTemplateEngine templateEngine;
+
 
 	    
 	    public void sendApprovalEmail(String to, String name, String email, String password) {
@@ -64,6 +74,29 @@ public class EmailService {
 	                "theatre_rejection_email",  // <--- template file
 	                model
 	        );
+	    }
+	    
+	    public void sendOtpMail(String to, String name, String otp) {
+	        try {
+	            MimeMessage message = mailSender.createMimeMessage();
+	            MimeMessageHelper helper =
+	                    new MimeMessageHelper(message, true, "UTF-8");
+
+	            helper.setTo(to);
+	            helper.setSubject("Password Reset OTP");
+
+	            Context context = new Context();
+	            context.setVariable("name", name);
+	            context.setVariable("otp", otp);
+
+	            String html = templateEngine.process("otp-email", context);
+	            helper.setText(html, true);
+
+	            mailSender.send(message);
+
+	        } catch (Exception e) {
+	            throw new RuntimeException("OTP email sending failed");
+	        }
 	    }
 	    
 	    
