@@ -21,9 +21,6 @@ public interface MovieService {
 	    List<MovieResponseDto> searchByLanguage(String language);
 	    
 	    List<MovieResponseDto> searchByGenre(String genre);
-	    
-	    void deleteMovie(Integer id);
-
 
 
 	

@@ -4,9 +4,9 @@ import lombok.Data;
 
 @Data
 public class GroupDto {
-	private Integer group_id;
+	private Integer id;
 	private String name;
 	private String role;
-	private String image_url;
+	private String imageUrl;
 	private String type;
 }
