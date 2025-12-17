@@ -71,7 +71,7 @@ public class MovieServiceImpl implements MovieService{
 //		existing.setGenres(movie.getGenres());
 //		existing.setFormats(movie.getFormats());
 		
-		BeanUtils.copyProperties(request, existing, "movieId"); //source, Target
+		BeanUtils.copyProperties(request, existing); //source, Target
 		Movie updated = movieRepository.save(existing);
 		return toDto(updated);
 	}
@@ -99,18 +99,19 @@ public class MovieServiceImpl implements MovieService{
 	@Override
 	public List<MovieResponseDto> searchByGenre(String genre) {
 	    List<Movie> movies = movieRepository.findByGenresContainingIgnoreCase(genre);
-	    List<MovieResponseDto> dtos = new java.util.ArrayList<>();
+	    List<MovieResponseDto> dtos = new ArrayList<>();
 	    for (Movie movie : movies) {
 	        dtos.add(toDto(movie));
 	    }
 	    return dtos;
 	}
-	
 
-	
-
-	
-
-	
+	@Override
+	public void deleteMovie(Integer id) {
+		Movie movie = movieRepository.findById(id)
+		        .orElseThrow(() -> new RuntimeException("Movie not found with id: " + id));
+		    movieRepository.delete(movie);
+		
+	}
 	
 }
