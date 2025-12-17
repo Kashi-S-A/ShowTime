@@ -2,7 +2,6 @@ package com.showtime.movie_service.entity;
 
 import com.showtime.movie_service.enums.MovieType;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -20,14 +19,10 @@ import lombok.Data;
 public class Group {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Integer group_id;
-	
-	@Column(name = "name") 
+	private Integer id;
 	private String name;
-	
-	
 	private String role;
-	private String image_url;
+	private String imageURL;
 	
 	@Enumerated(EnumType.STRING)
 	private MovieType type;
