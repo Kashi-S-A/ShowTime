@@ -9,7 +9,8 @@ import lombok.Data;
 @Data
 public class ScreenDTO {
 
-	private String theater_name;
-	private FormatSupported format_supported;
+	private String screenName;
+	private Integer theater_id;
+	private String format_supported;
 	private List<Category> category;
 }

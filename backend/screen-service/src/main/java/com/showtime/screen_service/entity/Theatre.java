@@ -1,6 +1,7 @@
 package com.showtime.screen_service.entity;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -10,25 +11,33 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import lombok.Data;
 
 @Entity
 @Data
 public class Theatre {
-	
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long theatre_id;
-	private String theatre_name;
-	private String address;
-	private String city;
-	private Integer pincode;
-	private String loc; 
-	private String theatre_status;
-	private String rejectReason;
+	Integer theatreId;
+	String theatre_name;
+	String address;
+	String city;
+	Integer pincode;
+	String loc;
+	String theatre_status;
+	String rejectReason;
+	
+	
 	@CreationTimestamp
 	@Column(updatable = false)
-	private LocalDateTime createdDateTime;
+	LocalDateTime createdDateTime;
+	
 	@UpdateTimestamp
-	private LocalDateTime updatedDateTime;
+	LocalDateTime updatedDateTime;
+	
+	@OneToMany(mappedBy = "theatre")
+	List<Screen> screen;
+	
+	
 }
