@@ -1,12 +1,11 @@
 package com.showtime.show_service.controller;
 
 import java.time.LocalDate;
-import java.util.Date;
+import java.util.ArrayList;
 import java.util.List;
 
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.convert.DtoInstantiatingConverter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,10 +21,15 @@ import com.showtime.show_service.entity.Category;
 import com.showtime.show_service.entity.Movie;
 import com.showtime.show_service.entity.Screen;
 import com.showtime.show_service.entity.Show;
+import com.showtime.show_service.entity.ShowCategory;
 import com.showtime.show_service.repository.CategoryRepository;
 import com.showtime.show_service.repository.MovieRepository;
 import com.showtime.show_service.repository.ScreenRepository;
+import com.showtime.show_service.repository.ShowCategoryRepository;
 import com.showtime.show_service.repository.ShowRepository;
+import com.showtime.show_service.service.MovieService;
+import com.showtime.show_service.service.ScreenService;
+import com.showtime.show_service.service.ShowCategoryService;
 import com.showtime.show_service.service.ShowService;
 
 import lombok.Data;
@@ -37,7 +41,7 @@ public class ShowController {
 		
 		@Autowired
 		private MovieRepository movieRepository;
-		
+				
 		@Autowired
 		private ShowRepository showRepository;
 		
@@ -49,57 +53,54 @@ public class ShowController {
 		
 		@Autowired
 		private ScreenRepository screenRepository;
-				
+						
+		@Autowired
+		private ShowCategoryService showCategoryService;
+		
 		@GetMapping("/add")
-		public ShowDTO addShow()
-		{
+		public ShowDTO addShow(@RequestParam Long screen_id) 
+		{			
+			Screen screen = screenRepository.findByScreenId(screen_id);
+			
+			List<Category> category = screen.getCategory();
+						
 			ShowDTO dto = new ShowDTO();
+			dto.setScreen_id(screen_id);
+			dto.setCategory(category);
+			
 			return dto;
 		}
 		
 		
-		//Adding Shows in the theatre
+		//Add Show to the theatre
 		@PostMapping("/add")
 		public ResponseEntity<String> addShow(@RequestBody ShowDTO dto) 
 		{			
+			Show show = new Show();
+			show.setShowDate(dto.getShow_date());
+			show.setShow_starttime(dto.getShow_starttime());
+			show.setShow_endtime(dto.getShow_endtime());
+			show.setLanguage(dto.getLanguages());
+			
 			String title = dto.getTitle();
 			Movie movie = movieRepository.findByTitle(title);	
 									
 			Long screen_id = dto.getScreen_id();
 			Screen screen = screenRepository.findByScreenId(screen_id);
 			
-			Show show = new Show();
-			show.setShowDate(dto.getShow_date());
-			show.setShow_time(dto.getShow_time());
-			show.setLanguage(dto.getLanguages());
-			
-			if(movie!=null && screen!=null)
+			if(movie!=null && screen!=null)	{
 				show.setMovie(movie);
 				show.setScreen(screen);
-			
-			//fetch from Screen Layout
-			List<Category> fetchedcategory = screen.getCategory();
-	
-			//Categories Added By Theatre Admin	
-			List<Category> categorydto =  dto.getCategory();
-		    
-			if(categorydto!=null)
-			{
-				for(Category catDTO: categorydto)
-				{
-					for(Category fetchCat: fetchedcategory)
-					{
-						if(catDTO.getCategory_name().equals(fetchCat.getCategory_name()))
-							fetchCat.setPrice(catDTO.getPrice());
-					}
-				}
 			}
+			else {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Movie or Screen Not found");
+			}
+	
+			List<Category> categoryDTO =  dto.getCategory();
+		    
+			List<ShowCategory> savedCategory = showCategoryService.saveCategory(categoryDTO);
 			
-			//returning the fetched category by setting price to that category
-			screen.setCategory(fetchedcategory);
-			show.setScreen(screen);
-			
-			List<Category> savedCategoryPrice = categoryRepository.saveAll(fetchedcategory);
+			show.setShowCategory(savedCategory);
 							
 			return showService.addShow(show);
 		}
@@ -156,27 +157,28 @@ public class ShowController {
 		
 		
 		@GetMapping("/edit")
-		public ShowDTO fetchShow(@RequestParam Integer show_id)
+		public Show fetchShow(@RequestParam Integer show_id)
 		{
-				Show show = showRepository.findByShowId(show_id);
-
-				ShowDTO dto = new ShowDTO();
-				dto.setCategory(show.getScreen().getCategory());
-				dto.setShow_date(show.getShowDate());
-				dto.setShow_time(show.getShow_time());
-				dto.setLanguages(show.getLanguage());
-				dto.setTitle(show.getMovie().getTitle());
-				dto.setScreen_id(show.getScreen().getScreenId());
-				
-				return dto;
+				Show show = showRepository.findByShowId(show_id);				
+				return show;
 		}
+		
 		
 		//edit a particular show
 		@PutMapping("/edit")
 		public ResponseEntity<String> editShow(@RequestBody ShowDTO dto, @RequestParam Integer show_id)
 		{
-			
 			Show show = showRepository.findByShowId(show_id);
+			
+			if(show!=null)	{
+				show.setShowDate(dto.getShow_date());
+				show.setShow_starttime(dto.getShow_starttime());
+				show.setShow_endtime(dto.getShow_endtime());
+				show.setLanguage(dto.getLanguages());
+			}	
+			else {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Show Not Found");
+			}	
 			
 			String title = dto.getTitle();
 			Movie movie = movieRepository.findByTitle(title);	
@@ -184,38 +186,20 @@ public class ShowController {
 			Long screen_id = dto.getScreen_id();
 			Screen screen = screenRepository.findByScreenId(screen_id);
 			
-			show.setShowDate(dto.getShow_date());
-			show.setShow_time(dto.getShow_time());
-			show.setLanguage(dto.getLanguages());
-			
-			if(movie!=null && screen!=null)
+			if(movie!=null && screen!=null)	{
 				show.setMovie(movie);
 				show.setScreen(screen);
-			
-			//fetch from Screen Layout
-			List<Category> fetchedcategory = screen.getCategory();
-	
-			//Categories Added By Theatre Admin	
-			List<Category> categorydto =  dto.getCategory();
-		    
-			if(categorydto!=null)
-			{
-				for(Category catDTO: categorydto)
-				{
-					for(Category fetchCat: fetchedcategory)
-					{
-						if(catDTO.getCategory_name().equals(fetchCat.getCategory_name()))
-							fetchCat.setPrice(catDTO.getPrice());
-					}
-				}
 			}
+			else {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Movie or Screen Not found");
+			}
+	
+			List<Category> categoryDTO =  dto.getCategory();
+		    
+			List<ShowCategory> updatedCategory = showCategoryService.updateCategory(categoryDTO);
 			
-			//returning the fetched category by setting price to that category
-			screen.setCategory(fetchedcategory);
-			show.setScreen(screen);
-			
-			List<Category> savedCategoryPrice = categoryRepository.saveAll(fetchedcategory);
-			
+			show.setShowCategory(updatedCategory);
+							
 			return showService.updateShow(show);
 		}
 		
